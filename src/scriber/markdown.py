@@ -46,6 +46,8 @@ def _parse_blocks(lines: list[str]) -> list[Block]:
     blocks: list[Block] = []
     paragraph: list[str] = []
     quote: list[str] = []
+    document_kind: str | None = None
+    document_lines: list[str] = []
 
     def flush_paragraph() -> None:
         if paragraph:
@@ -59,6 +61,22 @@ def _parse_blocks(lines: list[str]) -> list[Block]:
 
     for raw_line in lines:
         line = raw_line.strip()
+        if document_kind:
+            if line == ":::":
+                text = "\n".join(document_lines).strip()
+                if not text:
+                    raise ValueError(f"Empty ::: {document_kind} block")
+                blocks.append(Block(document_kind, text))
+                document_kind = None
+                document_lines.clear()
+            else:
+                document_lines.append(line)
+            continue
+        if line in {"::: note", "::: letter", "::: document"}:
+            flush_paragraph()
+            flush_quote()
+            document_kind = line.removeprefix("::: ")
+            continue
         if not line:
             flush_paragraph()
             flush_quote()
@@ -82,11 +100,19 @@ def _parse_blocks(lines: list[str]) -> list[Block]:
             flush_quote()
             blocks.append(Block("list_item", line[2:].strip()))
             continue
+        ordered = re.match(r"^\d+[.)]\s+(.+)$", line)
+        if ordered:
+            flush_paragraph()
+            flush_quote()
+            blocks.append(Block("ordered_item", ordered.group(1).strip()))
+            continue
         flush_quote()
         paragraph.append(line)
 
     flush_paragraph()
     flush_quote()
+    if document_kind:
+        raise ValueError(f"Unclosed ::: {document_kind} block")
     return blocks
 
 
@@ -98,11 +124,25 @@ def _section_kind(path: Path, group: str) -> str:
         "copyright": "copyright",
         "dedication": "dedication",
         "epigraph": "epigraph",
+        "foreword": "foreword",
+        "preface": "preface",
+        "prologue": "prologue",
+        "interlude": "interlude",
+        "epilogue": "epilogue",
+        "afterword": "afterword",
         "contents": "toc",
         "toc": "toc",
         "acknowledgements": "acknowledgements",
         "acknowledgments": "acknowledgements",
         "about_the_author": "about-author",
+        "author_note": "author-note",
+        "authors_note": "author-note",
+        "note_to_reader": "note-to-reader",
+        "notes": "endnotes",
+        "endnotes": "endnotes",
+        "glossary": "glossary",
+        "bibliography": "bibliography",
+        "also_by": "also-by",
     }
     return known.get(stem, "chapter" if group == "body" else group)
 

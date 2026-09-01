@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
+import hashlib
 import html
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
 
 import reportlab
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import DecodedStreamObject, NameObject
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
-from reportlab.lib.pagesizes import inch
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
+    ActionFlowable,
     BaseDocTemplate,
     Flowable,
     Frame,
@@ -54,20 +58,40 @@ class SectionMarker(Flowable):
         self.height = 0
 
     def draw(self) -> None:
-        page = self.canv.getPageNumber()
+        canvas = cast(Any, self.canv)
+        page = canvas.getPageNumber()
         self.page_map[self.section.identifier] = page
-        self.canv._scriber_section_title = self.section.title
-        self.canv._scriber_section_kind = self.section.kind
-        if self.section.group == "body" and not hasattr(
-            self.canv, "_scriber_body_start"
-        ):
-            self.canv._scriber_body_start = page
+        canvas._scriber_section_title = self.section.title
+        canvas._scriber_section_kind = self.section.kind
+        canvas._scriber_section_group = self.section.group
+        if self.section.group == "body" and not hasattr(canvas, "_scriber_body_start"):
+            canvas._scriber_body_start = page
+
+
+class RectoPad(ActionFlowable):
+    """Advance past a left-hand page so the next section starts on recto."""
+
+    def __init__(self) -> None:
+        super().__init__(())
+
+    def apply(self, doc) -> None:
+        if doc.page % 2 == 0:
+            doc.handle_pageBreak()
+
+
+class InvariantCanvas(Canvas):
+    """ReportLab canvas with stable IDs and timestamps."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        kwargs["invariant"] = 1
+        kwargs["pageCompression"] = 1
+        super().__init__(*args, **kwargs)
 
 
 def build_print_pdf(config: BookConfig, sections: list[Section]) -> PdfBuild:
     profile = get_profile(config.publish.profile)
-    config.output_dir.mkdir(parents=True, exist_ok=True)
-    output = config.output_dir / "paperback-interior.pdf"
+    config.pdf_dir.mkdir(parents=True, exist_ok=True)
+    output = config.pdf_dir / f"{config.slug}_kdp_interior.pdf"
     previous_map: dict[str, int] = {}
     inside = max(
         config.layout.inside_margin_inches or 0,
@@ -76,7 +100,7 @@ def build_print_pdf(config: BookConfig, sections: list[Section]) -> PdfBuild:
     )
 
     for pass_number in range(1, 9):
-        temporary = config.output_dir / f".interior-pass-{pass_number}.pdf"
+        temporary = config.pdf_dir / f".interior-pass-{pass_number}.pdf"
         page_map = _render_pass(
             config=config,
             sections=sections,
@@ -117,8 +141,8 @@ def _render_pass(
     inside_margin_inches: float,
     toc_pages: dict[str, int],
 ) -> dict[str, int]:
-    _register_fonts()
-    styles = _styles(config)
+    fonts = _register_fonts(config)
+    styles = _styles(config, fonts)
     page_map: dict[str, int] = {}
     trim_width = config.layout.trim_width_inches * inch
     trim_height = config.layout.trim_height_inches * inch
@@ -131,6 +155,8 @@ def _render_pass(
     for index, section in enumerate(sections):
         if index:
             story.append(PageBreak())
+            if config.layout.chapter_start_recto and section.group == "body":
+                story.append(RectoPad())
         story.extend(
             _section_story(
                 section,
@@ -168,7 +194,7 @@ def _render_pass(
         document.pageTemplate.frames = [frame]
 
     def on_page_end(canvas, _document) -> None:
-        _draw_page_furniture(canvas, config, inside_margin_inches)
+        _draw_page_furniture(canvas, config, inside_margin_inches, fonts["regular"])
 
     document = BaseDocTemplate(
         str(output),
@@ -187,7 +213,7 @@ def _render_pass(
             )
         ]
     )
-    document.build(story)
+    document.build(story, canvasmaker=InvariantCanvas)
     return page_map
 
 
@@ -223,19 +249,42 @@ def _section_story(
         return story
 
     first_paragraph = True
+    ordered_index = 0
     for block in section.blocks:
         if block.kind == "scene":
             story.append(Paragraph("• &nbsp; • &nbsp; •", styles["scene"]))
             first_paragraph = True
+            ordered_index = 0
         elif block.kind == "heading":
             story.append(Paragraph(_inline(block.text), styles["subheading"]))
             first_paragraph = True
+            ordered_index = 0
         elif block.kind == "quote":
             story.append(Paragraph(_inline(block.text), styles["quote"]))
             first_paragraph = True
+            ordered_index = 0
+        elif block.kind in {"note", "letter", "document"}:
+            story.append(
+                Paragraph(
+                    _inline(block.text).replace("\n", "<br/>"),
+                    styles["document"],
+                )
+            )
+            first_paragraph = True
+            ordered_index = 0
         elif block.kind == "list_item":
             story.append(Paragraph(f"• &nbsp; {_inline(block.text)}", styles["list"]))
+            ordered_index = 0
+        elif block.kind == "ordered_item":
+            ordered_index += 1
+            story.append(
+                Paragraph(
+                    f"{ordered_index}. &nbsp; {_inline(block.text)}",
+                    styles["list"],
+                )
+            )
         else:
+            ordered_index = 0
             style = styles["body_first"] if first_paragraph else styles["body"]
             story.append(Paragraph(_inline(block.text), style))
             first_paragraph = False
@@ -289,7 +338,12 @@ def _toc_table(
     return table
 
 
-def _draw_page_furniture(canvas, config: BookConfig, inside_margin: float) -> None:
+def _draw_page_furniture(
+    canvas,
+    config: BookConfig,
+    inside_margin: float,
+    regular_font: str,
+) -> None:
     body_start = getattr(canvas, "_scriber_body_start", None)
     kind = getattr(canvas, "_scriber_section_kind", "")
     if body_start is None or kind in {"titlepage", "copyright"}:
@@ -301,25 +355,34 @@ def _draw_page_furniture(canvas, config: BookConfig, inside_margin: float) -> No
     inside = inside_margin * inch
     x = width - outside if physical_page % 2 else inside
     canvas.saveState()
-    canvas.setFont("Scriber", 8)
+    canvas.setFont(regular_font, 8)
     canvas.setFillColor(colors.HexColor("#555555"))
     canvas.drawCentredString(x, 0.38 * inch, str(printed_page))
     title = getattr(canvas, "_scriber_section_title", "")
-    if title and kind == "chapter":
-        canvas.setFont("Scriber", 7.5)
+    group = getattr(canvas, "_scriber_section_group", "")
+    if title and group == "body":
+        canvas.setFont(regular_font, 7.5)
         canvas.drawCentredString(
             width / 2, config.layout.trim_height_inches * inch - 0.4 * inch, title
         )
     canvas.restoreState()
 
 
-def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
+def _styles(
+    config: BookConfig,
+    fonts: dict[str, str],
+) -> dict[str, ParagraphStyle]:
     body_size = config.layout.body_font_size
     leading = config.layout.body_leading
+    hyphenation = (
+        config.book.language.split("-", maxsplit=1)[0]
+        if config.typography.hyphenation
+        else ""
+    )
     return {
         "title": ParagraphStyle(
             "Title",
-            fontName="Scriber-Bold",
+            fontName=fonts["bold"],
             fontSize=26,
             leading=32,
             alignment=TA_CENTER,
@@ -327,7 +390,7 @@ def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
         ),
         "front_heading": ParagraphStyle(
             "FrontHeading",
-            fontName="Scriber-Bold",
+            fontName=fonts["bold"],
             fontSize=11,
             leading=14,
             alignment=TA_LEFT,
@@ -335,7 +398,7 @@ def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
         ),
         "chapter": ParagraphStyle(
             "Chapter",
-            fontName="Scriber-Bold",
+            fontName=fonts["bold"],
             fontSize=config.layout.chapter_font_size,
             leading=config.layout.chapter_font_size * 1.2,
             alignment=TA_CENTER,
@@ -343,7 +406,7 @@ def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
         ),
         "subheading": ParagraphStyle(
             "Subheading",
-            fontName="Scriber-Bold",
+            fontName=fonts["bold"],
             fontSize=body_size + 1,
             leading=leading,
             spaceBefore=10,
@@ -351,18 +414,19 @@ def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
         ),
         "body": ParagraphStyle(
             "Body",
-            fontName="Scriber",
+            fontName=fonts["regular"],
             fontSize=body_size,
             leading=leading,
             alignment=TA_JUSTIFY,
-            firstLineIndent=0.22 * inch,
+            firstLineIndent=config.layout.paragraph_indent_inches * inch,
             spaceAfter=0,
             allowWidows=0,
             allowOrphans=0,
+            hyphenationLang=hyphenation,
         ),
         "body_first": ParagraphStyle(
             "BodyFirst",
-            fontName="Scriber",
+            fontName=fonts["regular"],
             fontSize=body_size,
             leading=leading,
             alignment=TA_JUSTIFY,
@@ -370,10 +434,11 @@ def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
             spaceAfter=0,
             allowWidows=0,
             allowOrphans=0,
+            hyphenationLang=hyphenation,
         ),
         "quote": ParagraphStyle(
             "Quote",
-            fontName="Scriber-Italic",
+            fontName=fonts["italic"],
             fontSize=body_size - 0.5,
             leading=leading,
             leftIndent=0.28 * inch,
@@ -381,9 +446,22 @@ def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
             spaceBefore=6,
             spaceAfter=6,
         ),
+        "document": ParagraphStyle(
+            "Document",
+            fontName=fonts["italic"],
+            fontSize=body_size - 0.25,
+            leading=leading,
+            leftIndent=0.35 * inch,
+            rightIndent=0.35 * inch,
+            borderWidth=0.5,
+            borderColor=colors.HexColor("#999999"),
+            borderPadding=10,
+            spaceBefore=10,
+            spaceAfter=10,
+        ),
         "list": ParagraphStyle(
             "List",
-            fontName="Scriber",
+            fontName=fonts["regular"],
             fontSize=body_size,
             leading=leading,
             leftIndent=0.2 * inch,
@@ -391,7 +469,7 @@ def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
         ),
         "scene": ParagraphStyle(
             "Scene",
-            fontName="Scriber",
+            fontName=fonts["regular"],
             fontSize=8,
             leading=12,
             alignment=TA_CENTER,
@@ -400,13 +478,13 @@ def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
         ),
         "toc": ParagraphStyle(
             "Toc",
-            fontName="Scriber",
+            fontName=fonts["regular"],
             fontSize=9,
             leading=12,
         ),
         "toc_page": ParagraphStyle(
             "TocPage",
-            fontName="Scriber",
+            fontName=fonts["regular"],
             fontSize=9,
             leading=12,
             alignment=TA_CENTER,
@@ -414,27 +492,39 @@ def _styles(config: BookConfig) -> dict[str, ParagraphStyle]:
     }
 
 
-def _register_fonts() -> None:
-    if "Scriber" in pdfmetrics.getRegisteredFontNames():
-        return
+def _register_fonts(config: BookConfig) -> dict[str, str]:
     font_dir = Path(reportlab.__file__).resolve().parent / "fonts"
     paths = {
-        "Scriber": font_dir / "Vera.ttf",
-        "Scriber-Bold": font_dir / "VeraBd.ttf",
-        "Scriber-Italic": font_dir / "VeraIt.ttf",
-        "Scriber-BoldItalic": font_dir / "VeraBI.ttf",
+        "regular": config.typography.regular or font_dir / "Vera.ttf",
+        "bold": config.typography.bold or font_dir / "VeraBd.ttf",
+        "italic": config.typography.italic or font_dir / "VeraIt.ttf",
+        "bold_italic": config.typography.bold_italic or font_dir / "VeraBI.ttf",
     }
-    for name, path in paths.items():
+    digest = hashlib.sha256()
+    for style, path in paths.items():
         if not path.exists():
-            raise FileNotFoundError(f"Bundled ReportLab font not found: {path}")
-        pdfmetrics.registerFont(TTFont(name, str(path)))
+            raise FileNotFoundError(f"Typography font not found: {path}")
+        digest.update(style.encode("ascii"))
+        digest.update(path.read_bytes())
+    family = f"Scriber-{config.slug}-{digest.hexdigest()[:10]}"
+    names = {
+        "regular": f"{family}-Regular",
+        "bold": f"{family}-Bold",
+        "italic": f"{family}-Italic",
+        "bold_italic": f"{family}-BoldItalic",
+    }
+    if names["regular"] in pdfmetrics.getRegisteredFontNames():
+        return names
+    for style, path in paths.items():
+        pdfmetrics.registerFont(TTFont(names[style], str(path)))
     pdfmetrics.registerFontFamily(
-        "Scriber",
-        normal="Scriber",
-        bold="Scriber-Bold",
-        italic="Scriber-Italic",
-        boldItalic="Scriber-BoldItalic",
+        family,
+        normal=names["regular"],
+        bold=names["bold"],
+        italic=names["italic"],
+        boldItalic=names["bold_italic"],
     )
+    return names
 
 
 def _inline(value: str) -> str:

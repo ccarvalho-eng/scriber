@@ -44,10 +44,11 @@ def create_book(
         raise FileExistsError(f"Book already exists: {root}")
 
     for directory in (
-        root / "front",
-        root / "manuscript",
-        root / "back",
+        root / "manuscript" / "front_matter",
+        root / "manuscript" / "chapters",
+        root / "manuscript" / "back_matter",
         root / "assets" / "cover",
+        root / "assets" / "fonts",
     ):
         directory.mkdir(parents=True, exist_ok=False)
 
@@ -58,17 +59,23 @@ def create_book(
             author=author.strip(),
             language=language.strip(),
         ),
-        root / "front" / "00_title.md": _title_page(title, subtitle, author),
-        root / "front" / "01_copyright.md": _copyright_page(title, author),
-        root / "front" / "02_dedication.md": "# Dedication\n\nFor...\n",
-        root / "front" / "03_contents.md": "# Contents\n",
-        root / "manuscript" / "01_chapter.md": (
+        root / "manuscript" / "front_matter" / "00_title.md": _title_page(
+            title, subtitle, author
+        ),
+        root / "manuscript" / "front_matter" / "01_copyright.md": (
+            _copyright_page(title, author)
+        ),
+        root / "manuscript" / "front_matter" / "02_dedication.md": (
+            "# Dedication\n\nFor...\n"
+        ),
+        root / "manuscript" / "front_matter" / "03_contents.md": "# Contents\n",
+        root / "manuscript" / "chapters" / "01_chapter.md": (
             "# Chapter One\n\nBegin the manuscript here.\n"
         ),
-        root / "back" / "01_acknowledgements.md": (
+        root / "manuscript" / "back_matter" / "01_acknowledgements.md": (
             "# Acknowledgements\n\nAdd acknowledgements here.\n"
         ),
-        root / "back" / "02_about_the_author.md": (
+        root / "manuscript" / "back_matter" / "02_about_the_author.md": (
             f"# About the Author\n\n{author.strip()} is...\n"
         ),
     }
@@ -86,18 +93,23 @@ def _book_config(
     today = datetime.now(UTC).date()
     year = today.year
     edition_date = today.isoformat()
-    return f'''[book]
+    return f'''schema_version = 2
+
+[book]
 title = {_toml_string(title)}
 subtitle = {_toml_string(subtitle)}
 author = {_toml_string(author)}
 language = {_toml_string(language)}
 copyright_year = {year}
 edition_date = "{edition_date}"
-
-[contents]
-front = ["front/*.md"]
-body = ["manuscript/*.md"]
-back = ["back/*.md"]
+description = ""
+publisher = ""
+imprint = ""
+series = ""
+series_number = ""
+isbn_print = ""
+isbn_epub = ""
+subjects = []
 
 [layout]
 trim_width_inches = 6.0
@@ -110,6 +122,11 @@ gutter_safety_inches = 0.125
 body_font_size = 10.5
 body_leading = 14.5
 chapter_font_size = 20
+paragraph_indent_inches = 0.22
+chapter_start_recto = true
+
+[typography]
+hyphenation = true
 
 [publish]
 profile = "kdp-paperback"
@@ -121,7 +138,7 @@ max_pages = 828
 dpi = 300
 
 [cover]
-enabled = false
+enabled = "auto"
 front = "assets/cover/front.png"
 back = "assets/cover/back.png"
 background = "#20242a"
