@@ -58,6 +58,10 @@ class ValidationTest(unittest.TestCase):
                     "scriber.validate.available_release_tools",
                     return_value={"epubcheck": "epubcheck", "ace": None},
                 ),
+                patch(
+                    "scriber.validate.shutil.which",
+                    return_value="/bin/epubcheck",
+                ),
                 patch("scriber.validate.subprocess.run", return_value=completed),
             ):
                 result = build_book(discover_books(workspace)[0], release=True)
