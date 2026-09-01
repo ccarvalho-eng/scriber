@@ -37,6 +37,30 @@ uv tool install scriber-books
 uv tool upgrade scriber-books
 ```
 
+### Update or reinstall Scriber
+
+To replace an existing uv installation with the latest version from GitHub, use `--force`:
+
+```bash
+uv tool install --force git+https://github.com/ccarvalho-eng/scriber.git
+scriber --version
+```
+
+For pipx installations:
+
+```bash
+pipx install --force git+https://github.com/ccarvalho-eng/scriber.git
+scriber --version
+```
+
+You can also install a specific Git branch, tag, or commit by appending its ref to the repository URL:
+
+```bash
+uv tool install --force "git+https://github.com/ccarvalho-eng/scriber.git@v0.2.0"
+```
+
+Replace `v0.2.0` with the branch name, tag, or commit you need. The `scriber upgrade` command upgrades book configuration files to the current schema; it does not update the installed Scriber program.
+
 ## Create your first book
 
 Run one command in the directory that will hold your library:
