@@ -16,7 +16,7 @@ book.toml + ordered Markdown + optional cover panels
  gutter + spine + cover template/assembly
         +-----------+-----------+
                     |
-       release validation and manifest
+   release validation, proof report, and manifest
 ```
 
 ## Stable pagination
@@ -27,7 +27,7 @@ The PDF renderer repeats layout until the table of contents, section page map, p
 
 The edition date is the canonical build timestamp. EPUB entries use fixed timestamps, permissions, ordering, and compression. PDF canvases use invariant identifiers and timestamps. Publication manifests avoid wall-clock values and contain checksums for every deliverable.
 
-Reproducibility means identical supported inputs and tool versions are intended to produce identical deliverables. The manifest records the profile version needed to interpret the geometry. Changes in Python or rendering dependencies may still change output, so released editions should retain their lockfile and manifest.
+Reproducibility means identical supported inputs and tool versions are intended to produce identical deliverables. The manifest records the profile version and its primary retailer source, which are needed to interpret the geometry and limits. Changes in Python or rendering dependencies may still change output, so released editions should retain their lockfile and manifest.
 
 ## Trust boundaries
 

@@ -4,6 +4,18 @@ All notable changes are documented here. Scriber follows [Semantic Versioning](h
 
 ## [Unreleased]
 
+### Added
+
+- Author-readable HTML proof reports and copy-friendly retailer metadata sheets.
+- Versioned source attribution for publishing rules in dimensions and manifests.
+- Least-privilege, SHA-pinned GitHub CI across the oldest and newest supported Python versions.
+
+### Changed
+
+- KDP paperback page limits now follow the selected ink and paper combination.
+- Release validation now blocks unverified trim sizes and checks minimum text size, opening metadata, blank-page runs, and cover file size.
+- New book configurations rely on the retailer profile instead of exposing a redundant maximum-page setting.
+
 ## [0.2.0] - 2026-08-31
 
 ### Added

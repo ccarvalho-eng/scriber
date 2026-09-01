@@ -27,6 +27,7 @@ class ConfigTest(unittest.TestCase):
                 ("manuscript/chapters/*.md",),
             )
             self.assertEqual(config.schema_version, 2)
+            self.assertNotIn("max_pages", content)
 
     def test_partial_custom_font_family_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

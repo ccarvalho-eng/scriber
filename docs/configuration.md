@@ -71,11 +71,12 @@ format = "paperback"
 ink = "black"
 paper = "cream"
 interior_bleed = false
-max_pages = 828
 dpi = 300
 ```
 
-Scriber 0.2 supports text-led, no-bleed paperback interiors. Unsupported options are rejected instead of silently producing incorrect geometry.
+Scriber derives the allowed page range from the verified trim, ink, and paper combination in the active profile. Existing configurations may retain `max_pages` as an optional stricter ceiling, but it can never expand the retailer limit. The verified KDP paperback combinations are versioned from the [official print options](https://kdp.amazon.com/en_US/help/topic/G201834180).
+
+Scriber supports text-led, no-bleed paperback interiors. A custom trim can be used for drafts, but release validation blocks trims not covered by the versioned profile instead of claiming they are retailer-safe. Unsupported ink and paper combinations are rejected.
 
 ## Cover
 

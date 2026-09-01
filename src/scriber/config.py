@@ -174,9 +174,7 @@ def load_book_config(source: Path, workspace: Path | None = None) -> BookConfig:
         dpi=_positive_int(publish_values.get("dpi", 300), "dpi"),
     )
     if publish.interior_bleed:
-        raise ValueError(
-            "Interior bleed is not supported in Scriber 0.1; use a no-bleed layout"
-        )
+        raise ValueError("Interior bleed is not supported; use a no-bleed layout")
     front = _optional_asset_path(
         root, cover_values.get("front", "assets/cover/front.png"), "cover"
     )

@@ -77,25 +77,40 @@ def _validate_interior(
     profile = get_profile(config.publish.profile)
     reader = PdfReader(str(path))
     page_count = len(reader.pages)
+    if config.publish.format != "paperback":
+        errors.append("publish.format must be paperback when profile is kdp-paperback")
     if not reader.pages:
         errors.append("Paperback interior contains no pages")
         return
     if page_count % 2:
         errors.append("Paperback interior page count must be even")
-    if page_count < profile.minimum_pages:
-        message = (
-            f"Paperback has {page_count} pages; profile minimum is "
-            f"{profile.minimum_pages}"
+    try:
+        minimum_pages, profile_maximum = profile.page_limits(
+            trim_width_inches=config.layout.trim_width_inches,
+            trim_height_inches=config.layout.trim_height_inches,
+            ink=config.publish.ink,
+            paper=config.publish.paper,
         )
-        if strict_retailer:
-            errors.append(message)
-        else:
-            warnings.append(message)
-    if page_count > config.publish.max_pages:
-        errors.append(
-            f"Paperback has {page_count} pages; configured maximum is "
-            f"{config.publish.max_pages}"
-        )
+    except ValueError as error:
+        _retailer_issue(str(error), errors, warnings, strict_retailer)
+    else:
+        if page_count < minimum_pages:
+            _retailer_issue(
+                f"Paperback has {page_count} pages; profile minimum is {minimum_pages}",
+                errors,
+                warnings,
+                strict_retailer,
+            )
+        maximum_pages = min(profile_maximum, config.publish.max_pages)
+        if page_count > maximum_pages:
+            source = (
+                "configured maximum"
+                if config.publish.max_pages < profile_maximum
+                else "profile maximum"
+            )
+            errors.append(
+                f"Paperback has {page_count} pages; {source} is {maximum_pages}"
+            )
     minimum_outer = profile.minimum_outside_margin(config.publish.interior_bleed)
     for label, margin in (
         ("outside", config.layout.outside_margin_inches),
@@ -122,6 +137,9 @@ def _validate_interior(
     unembedded = _unembedded_fonts(reader)
     if unembedded:
         errors.append(f"Interior contains unembedded fonts: {sorted(unembedded)}")
+    if min(config.layout.body_font_size, config.layout.chapter_font_size) < 7:
+        errors.append("Interior text must be at least 7 points for KDP")
+    _validate_interior_text(config, reader, errors, warnings, strict_retailer)
 
 
 def _validate_epub(path: Path, errors: list[str]) -> None:
@@ -168,6 +186,10 @@ def _validate_cover(
         errors.append("Missing ebook-cover.jpg")
     if not interior.exists():
         return
+    if cover.stat().st_size > 650 * 1024 * 1024:
+        errors.append("Paperback cover exceeds KDP's 650 MB file limit")
+    elif cover.stat().st_size > 40 * 1024 * 1024:
+        warnings.append("Paperback cover exceeds KDP's recommended 40 MB size")
     page_count = len(PdfReader(str(interior)).pages)
     expected = get_profile(config.publish.profile).cover_dimensions(
         page_count=page_count,
@@ -195,6 +217,54 @@ def _validate_cover(
     if abs(height - expected.height_inches) > 0.01:
         errors.append(
             f"Cover height is {height:.3f}; expected {expected.height_inches:.3f} inches"
+        )
+
+
+def _retailer_issue(
+    message: str,
+    errors: list[str],
+    warnings: list[str],
+    strict: bool,
+) -> None:
+    if strict:
+        errors.append(message)
+    else:
+        warnings.append(message)
+
+
+def _validate_interior_text(
+    config: BookConfig,
+    reader: PdfReader,
+    errors: list[str],
+    warnings: list[str],
+    strict: bool,
+) -> None:
+    page_text = [page.extract_text() or "" for page in reader.pages]
+    opening_text = "\n".join(page_text[:10])
+    for label, value in (
+        ("title", config.book.title),
+        ("author", config.book.author),
+    ):
+        if value.casefold() not in opening_text.casefold():
+            _retailer_issue(
+                f"Book {label} is missing from the opening interior pages",
+                errors,
+                warnings,
+                strict,
+            )
+
+    longest_blank_run = 0
+    current_blank_run = 0
+    for text in page_text:
+        if text.strip():
+            current_blank_run = 0
+        else:
+            current_blank_run += 1
+            longest_blank_run = max(longest_blank_run, current_blank_run)
+    if longest_blank_run >= 2:
+        warnings.append(
+            f"Interior contains {longest_blank_run} consecutive blank pages; "
+            "review intentional pagination"
         )
 
 

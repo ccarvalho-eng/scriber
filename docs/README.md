@@ -13,6 +13,7 @@ Use this index to find everything needed to operate Scriber without reading its 
 - [Cover guide](covers.md): template geometry, artwork files, resolution, automatic compilation, and common failures.
 - [Configuration reference](configuration.md): every `book.toml` table and field.
 - [Output reference](output.md): every file under `dist/` and when to use it.
+- [Proof and metadata reports](proofing.md): readiness status, warnings, section starts, and retailer data.
 - [Publishing checklist](publishing.md): print, ebook, metadata, and retailer submission checks.
 
 ## Maintain a workspace

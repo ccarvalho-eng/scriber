@@ -81,6 +81,8 @@ Each output line is JSON with:
 | `pages` | Stabilized even print page count |
 | `mode` | `draft` or `release` |
 | `output` | Workspace-relative build directory |
+| `proof` | Author-readable HTML proof report |
+| `metadata` | Copy-friendly retailer metadata sheet |
 | `valid` | Whether errors are empty |
 | `checks` | Completed validation stages |
 | `errors` | Blocking problems |
@@ -94,7 +96,7 @@ Builds and strictly validates all or selected books:
 scriber release [slugs...]
 ```
 
-This is the author-facing equivalent of `scriber build --release`. It enforces retailer page limits, promotes cover-resolution risks to errors, and requires EPUBCheck. Ace by DAISY runs when installed.
+This is the author-facing equivalent of `scriber build --release`. It enforces the verified trim and ink/paper page limits, promotes cover-resolution risks to errors, and requires EPUBCheck. Ace by DAISY runs when installed. Open the generated `proof_report.html` for the complete result.
 
 ## `scriber validate`
 

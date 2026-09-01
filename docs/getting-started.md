@@ -36,7 +36,7 @@ Files are read in lexical filename order. Prefix them with numbers to make the o
 scriber build
 ```
 
-Open the interior PDF and EPUB under the book's `dist/`. Short drafts build successfully but produce a retailer page-count warning.
+Open `dist/proof_report.html` first. It links to the interior PDF, EPUB, cover template, and other artifacts while summarizing anything that needs attention. Short drafts build successfully but produce a retailer page-count warning.
 
 ## 5. Add cover artwork
 
@@ -57,4 +57,4 @@ Install EPUBCheck, run `scriber doctor`, then:
 scriber release first-novel
 ```
 
-Resolve every error. Review warnings, the print PDF, cover preview, EPUB, manifest, and retailer preview before submission.
+Resolve every error in `proof_report.html`, review its warnings, and use `retailer_metadata.md` when filling the retailer listing. Review the print PDF, cover preview, EPUB, manifest, and retailer preview before submission.

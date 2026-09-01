@@ -52,6 +52,14 @@ The trim is too narrow for the configured inside and outside margins. Increase t
 
 Draft builds warn; release builds fail. Continue writing or choose a retailer format that accepts the final length. Do not add meaningless blank pages solely to bypass a retailer minimum.
 
+## Trim size is not verified
+
+Draft builds can render a custom trim, but release builds require a size covered by the active versioned retailer profile. For a typical novel, use 5 × 8, 5.25 × 8, 5.5 × 8.5, or 6 × 9 inches. If the retailer has changed its options, open an issue with the current primary documentation rather than bypassing the release check.
+
+## Unsupported ink and paper combination
+
+Black ink supports white, cream, or groundwood paper. Standard and premium color use white paper. Change `publish.ink` or `publish.paper` to a valid pair; Scriber will not guess because the selection affects page limits and spine width.
+
 ## Interior contains unembedded fonts
 
 Provide all four custom TTF faces and verify that ReportLab can embed them. Do not use a system-only font or a font whose embedding rights are unclear.
