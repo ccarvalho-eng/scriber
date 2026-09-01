@@ -13,6 +13,7 @@ from scriber.markdown import load_sections
 from scriber.model import BookConfig
 from scriber.pdf import PdfBuild, build_print_pdf
 from scriber.profiles import CoverDimensions, get_profile
+from scriber.report import write_metadata_sheet, write_proof_report
 from scriber.validate import ValidationResult, validate_book
 
 
@@ -25,6 +26,8 @@ class BookBuild:
     cover: CoverBuild | None
     cover_template: Path
     validation: ValidationResult
+    proof_report: Path
+    metadata_sheet: Path
     manifest: Path
 
 
@@ -45,13 +48,34 @@ def build_book(config: BookConfig, release: bool = False) -> BookBuild:
         sections,
         ebook_cover=cover.ebook_cover if cover else None,
     )
-    _write_dimensions(config, pdf, dimensions)
+    dimensions_file = _write_dimensions(config, pdf, dimensions)
     validation = validate_book(
         config,
         strict_retailer=release,
         release=release,
     )
-    manifest = _write_manifest(config, pdf, epub, cover, cover_template, validation)
+    artifact_paths = [pdf.path, epub.path, cover_template, dimensions_file]
+    if cover:
+        artifact_paths.extend([cover.print_pdf, cover.preview, cover.ebook_cover])
+    metadata_sheet = write_metadata_sheet(config, pdf)
+    artifact_paths.append(metadata_sheet)
+    proof_report = write_proof_report(
+        config,
+        pdf,
+        epub,
+        validation,
+        artifact_paths,
+    )
+    manifest = _write_manifest(
+        config,
+        pdf,
+        epub,
+        cover,
+        cover_template,
+        validation,
+        proof_report,
+        metadata_sheet,
+    )
     return BookBuild(
         slug=config.slug,
         output_dir=config.output_dir,
@@ -60,6 +84,8 @@ def build_book(config: BookConfig, release: bool = False) -> BookBuild:
         cover=cover,
         cover_template=cover_template,
         validation=validation,
+        proof_report=proof_report,
+        metadata_sheet=metadata_sheet,
         manifest=manifest,
     )
 
@@ -72,6 +98,8 @@ def _write_dimensions(
     output = config.output_dir / "dimensions.json"
     values = {
         "profile": config.publish.profile,
+        "profile_version": get_profile(config.publish.profile).version,
+        "profile_source": get_profile(config.publish.profile).source_url,
         "page_count": pdf.page_count,
         "trim_inches": [
             config.layout.trim_width_inches,
@@ -96,12 +124,16 @@ def _write_manifest(
     cover: CoverBuild | None,
     cover_template: Path,
     validation: ValidationResult,
+    proof_report: Path,
+    metadata_sheet: Path,
 ) -> Path:
     paths = [
         pdf.path,
         epub.path,
         config.output_dir / "dimensions.json",
         cover_template,
+        proof_report,
+        metadata_sheet,
     ]
     if cover:
         paths.extend([cover.print_pdf, cover.preview, cover.ebook_cover])
@@ -124,6 +156,7 @@ def _write_manifest(
         "profile": {
             "name": config.publish.profile,
             "version": get_profile(config.publish.profile).version,
+            "source": get_profile(config.publish.profile).source_url,
             "format": config.publish.format,
             "ink": config.publish.ink,
             "paper": config.publish.paper,
@@ -142,6 +175,8 @@ def _write_manifest(
         },
         "cover_compiled": cover is not None,
         "cover_template": cover_template.relative_to(config.output_dir).as_posix(),
+        "proof_report": proof_report.relative_to(config.output_dir).as_posix(),
+        "metadata_sheet": metadata_sheet.relative_to(config.output_dir).as_posix(),
         "validation": {
             "valid": validation.valid,
             "errors": validation.errors,

@@ -39,7 +39,6 @@ format = "paperback"
 ink = "black"
 paper = "cream"
 interior_bleed = false
-max_pages = 828
 dpi = 300
 
 [cover]

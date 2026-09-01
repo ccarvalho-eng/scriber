@@ -2,6 +2,7 @@
 
 ## Manuscript
 
+- Open `proof_report.html` and resolve every blocking error.
 - Confirm title, subtitle, author, copyright year, language, and edition date.
 - Remove placeholder text and unwanted starter matter.
 - Check chapter order and headings.
@@ -31,6 +32,7 @@
 
 ## Retailer submission
 
+- Copy listing values from `retailer_metadata.md`.
 - Upload the interior, cover, and EPUB from the matching build.
 - Match retailer metadata to `book.toml`.
 - Use the correct ISBN for each format.

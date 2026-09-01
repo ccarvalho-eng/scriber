@@ -45,6 +45,40 @@ class KdpPaperbackProfileTest(unittest.TestCase):
         self.assertFalse(self.profile.spine_text_allowed(79))
         self.assertTrue(self.profile.spine_text_allowed(80))
 
+    def test_page_limits_follow_ink_and_paper(self) -> None:
+        cases = {
+            ("black", "white"): (24, 828),
+            ("black", "cream"): (24, 776),
+            ("black", "groundwood"): (24, 812),
+            ("standard-color", "white"): (72, 600),
+            ("premium-color", "white"): (24, 828),
+        }
+        for (ink, paper), expected in cases.items():
+            with self.subTest(ink=ink, paper=paper):
+                self.assertEqual(
+                    self.profile.page_limits(
+                        trim_width_inches=6,
+                        trim_height_inches=9,
+                        ink=ink,
+                        paper=paper,
+                    ),
+                    expected,
+                )
+
+    def test_retailer_safe_trim_sizes_are_explicit(self) -> None:
+        self.assertTrue(self.profile.trim_supported(5.5, 8.5))
+        self.assertTrue(self.profile.trim_supported(6, 9))
+        self.assertFalse(self.profile.trim_supported(6.1, 9.1))
+
+    def test_invalid_ink_and_paper_combination_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Unsupported KDP paperback"):
+            self.profile.page_limits(
+                trim_width_inches=6,
+                trim_height_inches=9,
+                ink="standard-color",
+                paper="cream",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

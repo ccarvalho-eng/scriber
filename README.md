@@ -1,5 +1,6 @@
 # Scriber
 
+[![CI](https://github.com/ccarvalho-eng/scriber/actions/workflows/ci.yml/badge.svg)](https://github.com/ccarvalho-eng/scriber/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB.svg?logo=python&logoColor=white)](pyproject.toml)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Status: Beta](https://img.shields.io/badge/Status-Beta-orange.svg)](CHANGELOG.md)
@@ -122,10 +123,12 @@ dist/
   cover/
     winter-road_cover_template.png
   dimensions.json
+  proof_report.html
+  retailer_metadata.md
   publication_manifest.json
 ```
 
-The manifest records the publishing profile, stabilized page count, resolved gutter, section pages, identifiers, validation results, file sizes, and SHA-256 checksums.
+Open `proof_report.html` after every build. It summarizes readiness, blocking errors, warnings, edition settings, section starts, and links to the generated files. `retailer_metadata.md` is the copy-friendly source of truth for the retailer listing. The manifest records the publishing profile, stabilized page count, resolved gutter, section pages, identifiers, validation results, file sizes, and SHA-256 checksums.
 
 ## Write the manuscript
 
@@ -206,8 +209,9 @@ scriber build --release
 
 Release mode checks:
 
-- page count, trim size, mirrored gutter, even pagination, and embedded fonts;
-- KDP profile limits and page-count-dependent cover geometry;
+- page count, verified trim size, mirrored gutter, even pagination, and embedded fonts;
+- KDP limits for the selected ink and paper combination and page-count-dependent cover geometry;
+- minimum text size, excessive blank-page runs, and title/author presence;
 - ISBN check digits and publication metadata;
 - EPUB ZIP structure, XML, navigation, metadata, and reading order;
 - cover dimensions, source resolution, and crop risk;

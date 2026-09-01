@@ -40,6 +40,14 @@ class BuildTest(unittest.TestCase):
             self.assertEqual(result.epub.path.parent.name, "epub")
             self.assertEqual(result.cover_template.parent.name, "cover")
             self.assertEqual(result.manifest.name, "publication_manifest.json")
+            self.assertEqual(result.proof_report.name, "proof_report.html")
+            self.assertEqual(result.metadata_sheet.name, "retailer_metadata.md")
+            self.assertTrue(result.proof_report.exists())
+            self.assertTrue(result.metadata_sheet.exists())
+            self.assertIn(
+                "The Winter Road",
+                result.proof_report.read_text(encoding="utf-8"),
+            )
             self.assertTrue(result.validation.valid)
             self.assertTrue(validate_book(config, strict_retailer=True).valid)
             self.assertEqual(len(PdfReader(str(result.pdf.path)).pages) % 2, 0)

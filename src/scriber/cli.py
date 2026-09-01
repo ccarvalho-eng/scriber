@@ -53,6 +53,11 @@ def main(argv: list[str] | None = None) -> int:
                             "pages": result.pdf.page_count,
                             "mode": "release" if release else "draft",
                             "output": _display_path(result.output_dir, workspace),
+                            "proof": _display_path(result.proof_report, workspace),
+                            "metadata": _display_path(
+                                result.metadata_sheet,
+                                workspace,
+                            ),
                             "valid": result.validation.valid,
                             "checks": result.validation.checks,
                             "errors": result.validation.errors,
