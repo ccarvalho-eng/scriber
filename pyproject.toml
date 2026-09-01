@@ -24,7 +24,7 @@ dependencies = [
   "pillow>=11.0,<13",
   "pyphen>=0.17,<1",
   "pypdf>=5.0,<7",
-  "reportlab>=4.2,<5",
+  "reportlab>=4.2,<6",
 ]
 
 [project.urls]
