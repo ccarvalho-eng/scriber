@@ -14,6 +14,14 @@ class BookMetadata:
     language: str
     copyright_year: int
     edition_date: str
+    description: str = ""
+    publisher: str = ""
+    imprint: str = ""
+    series: str = ""
+    series_number: str = ""
+    isbn_print: str = ""
+    isbn_epub: str = ""
+    subjects: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def full_title(self) -> str:
@@ -41,6 +49,17 @@ class LayoutConfig:
     body_font_size: float
     body_leading: float
     chapter_font_size: float
+    paragraph_indent_inches: float
+    chapter_start_recto: bool
+
+
+@dataclass(frozen=True)
+class TypographyConfig:
+    regular: Path | None
+    bold: Path | None
+    italic: Path | None
+    bold_italic: Path | None
+    hyphenation: bool
 
 
 @dataclass(frozen=True)
@@ -71,15 +90,29 @@ class BookConfig:
     root: Path
     source: Path
     slug: str
+    schema_version: int
     book: BookMetadata
     contents: ContentsConfig
     layout: LayoutConfig
+    typography: TypographyConfig
     publish: PublishConfig
     cover: CoverConfig
 
     @property
     def output_dir(self) -> Path:
         return self.root / "dist"
+
+    @property
+    def pdf_dir(self) -> Path:
+        return self.output_dir / "pdf"
+
+    @property
+    def epub_dir(self) -> Path:
+        return self.output_dir / "epub"
+
+    @property
+    def cover_dir(self) -> Path:
+        return self.output_dir / "cover"
 
 
 @dataclass(frozen=True)

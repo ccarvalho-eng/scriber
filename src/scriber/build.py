@@ -5,10 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 
-from scriber.cover import CoverBuild, build_cover
+from scriber.cover import CoverBuild, build_cover, build_cover_template
 from scriber.epub import EpubBuild, build_epub
 from scriber.markdown import load_sections
 from scriber.model import BookConfig
@@ -24,11 +23,12 @@ class BookBuild:
     pdf: PdfBuild
     epub: EpubBuild
     cover: CoverBuild | None
+    cover_template: Path
     validation: ValidationResult
     manifest: Path
 
 
-def build_book(config: BookConfig) -> BookBuild:
+def build_book(config: BookConfig, release: bool = False) -> BookBuild:
     sections = load_sections(config)
     pdf = build_print_pdf(config, sections)
     dimensions = get_profile(config.publish.profile).cover_dimensions(
@@ -39,20 +39,26 @@ def build_book(config: BookConfig) -> BookBuild:
         paper=config.publish.paper,
     )
     cover = build_cover(config, pdf.page_count)
+    cover_template = build_cover_template(config, pdf.page_count)
     epub = build_epub(
         config,
         sections,
         ebook_cover=cover.ebook_cover if cover else None,
     )
     _write_dimensions(config, pdf, dimensions)
-    validation = validate_book(config, strict_retailer=False)
-    manifest = _write_manifest(config, pdf, epub, cover, validation)
+    validation = validate_book(
+        config,
+        strict_retailer=release,
+        release=release,
+    )
+    manifest = _write_manifest(config, pdf, epub, cover, cover_template, validation)
     return BookBuild(
         slug=config.slug,
         output_dir=config.output_dir,
         pdf=pdf,
         epub=epub,
         cover=cover,
+        cover_template=cover_template,
         validation=validation,
         manifest=manifest,
     )
@@ -88,24 +94,32 @@ def _write_manifest(
     pdf: PdfBuild,
     epub: EpubBuild,
     cover: CoverBuild | None,
+    cover_template: Path,
     validation: ValidationResult,
 ) -> Path:
     paths = [
         pdf.path,
         epub.path,
         config.output_dir / "dimensions.json",
+        cover_template,
     ]
     if cover:
         paths.extend([cover.print_pdf, cover.preview, cover.ebook_cover])
     values = {
-        "schema_version": 1,
-        "generated_at": datetime.now(UTC).isoformat(),
+        "schema_version": 2,
+        "generated_at": f"{config.book.edition_date}T00:00:00+00:00",
         "book": {
             "slug": config.slug,
             "title": config.book.title,
             "subtitle": config.book.subtitle,
             "author": config.book.author,
             "language": config.book.language,
+            "publisher": config.book.publisher,
+            "imprint": config.book.imprint,
+            "series": config.book.series,
+            "series_number": config.book.series_number,
+            "isbn_print": config.book.isbn_print,
+            "isbn_epub": config.book.isbn_epub,
         },
         "profile": {
             "name": config.publish.profile,
@@ -127,20 +141,21 @@ def _write_manifest(
             "sections": epub.sections,
         },
         "cover_compiled": cover is not None,
+        "cover_template": cover_template.relative_to(config.output_dir).as_posix(),
         "validation": {
             "valid": validation.valid,
             "errors": validation.errors,
             "warnings": validation.warnings,
         },
         "files": {
-            path.name: {
+            path.relative_to(config.output_dir).as_posix(): {
                 "bytes": path.stat().st_size,
                 "sha256": _sha256(path),
             }
             for path in paths
         },
     }
-    output = config.output_dir / "build-manifest.json"
+    output = config.output_dir / "publication_manifest.json"
     output.write_text(json.dumps(values, indent=2) + "\n", encoding="utf-8")
     return output
 

@@ -1,0 +1,52 @@
+schema_version = 2
+
+[book]
+title = "The Lantern"
+subtitle = "A Scriber Example"
+author = "Example Author"
+language = "en-US"
+copyright_year = 2026
+edition_date = "2026-08-31"
+description = "A tiny example showing the files needed to build a novel."
+publisher = "Example Press"
+imprint = ""
+series = ""
+series_number = ""
+isbn_print = ""
+isbn_epub = ""
+subjects = ["Fiction"]
+
+[layout]
+trim_width_inches = 6.0
+trim_height_inches = 9.0
+inside_margin_inches = "auto"
+outside_margin_inches = 0.5
+top_margin_inches = 0.7
+bottom_margin_inches = 0.7
+gutter_safety_inches = 0.125
+body_font_size = 10.5
+body_leading = 14.5
+chapter_font_size = 20
+paragraph_indent_inches = 0.22
+chapter_start_recto = true
+
+[typography]
+hyphenation = true
+
+[publish]
+profile = "kdp-paperback"
+format = "paperback"
+ink = "black"
+paper = "cream"
+interior_bleed = false
+max_pages = 828
+dpi = 300
+
+[cover]
+enabled = "auto"
+front = "assets/cover/front.png"
+back = "assets/cover/back.png"
+background = "#20242a"
+spine_title = true
+spine_author = true
+text_color = "#ffffff"
