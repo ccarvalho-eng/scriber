@@ -44,10 +44,10 @@ outside_margin_inches = 0.5
 top_margin_inches = 0.7
 bottom_margin_inches = 0.7
 gutter_safety_inches = 0.125
-body_font_size = 10.5
-body_leading = 14.5
+body_font_size = 10.2
+body_leading = 14.25
 chapter_font_size = 20
-paragraph_indent_inches = 0.22
+paragraph_indent_inches = 0.19
 chapter_start_recto = true
 ```
 
@@ -60,7 +60,9 @@ The automatic inside margin is resolved from the final page count and current pu
 hyphenation = true
 ```
 
-To use a custom family, provide `regular`, `bold`, `italic`, and `bold_italic` paths. Font paths must stay within the book directory. Verify that the license permits embedding and commercial publication.
+The default theme pairs Gelasio body text with Cinzel display headings. Gelasio is metrics-compatible with Georgia, giving new books a traditional literary page without relying on system fonts. Both families are embedded in print and EPUB output.
+
+To use a custom body family, provide `regular`, `bold`, `italic`, and `bold_italic` paths. Font paths must stay within the book directory. Verify that the license permits embedding and commercial publication. Cinzel remains the display face.
 
 ## Publishing profile
 

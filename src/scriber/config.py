@@ -122,16 +122,16 @@ def load_book_config(source: Path, workspace: Path | None = None) -> BookConfig:
         ),
         gutter_safety_inches=float(layout_values.get("gutter_safety_inches", 0.125)),
         body_font_size=_positive_float(
-            layout_values.get("body_font_size", 10.5), "body_font_size"
+            layout_values.get("body_font_size", 10.2), "body_font_size"
         ),
         body_leading=_positive_float(
-            layout_values.get("body_leading", 14.5), "body_leading"
+            layout_values.get("body_leading", 14.25), "body_leading"
         ),
         chapter_font_size=_positive_float(
             layout_values.get("chapter_font_size", 20), "chapter_font_size"
         ),
         paragraph_indent_inches=_nonnegative_float(
-            layout_values.get("paragraph_indent_inches", 0.22),
+            layout_values.get("paragraph_indent_inches", 0.19),
             "paragraph_indent_inches",
         ),
         chapter_start_recto=_boolean(

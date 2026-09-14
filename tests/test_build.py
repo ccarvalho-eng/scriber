@@ -50,10 +50,25 @@ class BuildTest(unittest.TestCase):
             )
             self.assertTrue(result.validation.valid)
             self.assertTrue(validate_book(config, strict_retailer=True).valid)
-            self.assertEqual(len(PdfReader(str(result.pdf.path)).pages) % 2, 0)
+            reader = PdfReader(str(result.pdf.path))
+            self.assertEqual(len(reader.pages) % 2, 0)
+            font_names = {
+                str(reference.get_object().get("/BaseFont", ""))
+                for page in reader.pages
+                for reference in (page.get("/Resources") or {})
+                .get("/Font", {})
+                .values()
+            }
+            self.assertTrue(any("Gelasio" in name for name in font_names))
+            self.assertTrue(any("Cinzel" in name for name in font_names))
             with zipfile.ZipFile(result.epub.path) as archive:
                 self.assertEqual(archive.namelist()[0], "mimetype")
                 self.assertIn("EPUB/package.opf", archive.namelist())
+                self.assertIn("EPUB/fonts/regular.ttf", archive.namelist())
+                self.assertIn("EPUB/fonts/display.ttf", archive.namelist())
+                stylesheet = archive.read("EPUB/styles/book.css").decode("utf-8")
+                self.assertIn('font-family: "Scriber Body", serif', stylesheet)
+                self.assertIn('font-family: "Scriber Display", serif', stylesheet)
 
     def test_supplied_cover_panels_compile_after_pagination(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

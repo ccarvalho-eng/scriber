@@ -48,6 +48,9 @@ class ScaffoldTest(unittest.TestCase):
             self.assertGreaterEqual(len(created), 8)
             books = discover_books(workspace)
             self.assertEqual([book.slug for book in books], ["winter-road"])
+            self.assertEqual(books[0].layout.body_font_size, 10.2)
+            self.assertEqual(books[0].layout.body_leading, 14.25)
+            self.assertEqual(books[0].layout.paragraph_indent_inches, 0.19)
             sections = load_sections(books[0])
             self.assertEqual(
                 [section.group for section in sections],

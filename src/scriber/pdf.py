@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-import reportlab
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import DecodedStreamObject, NameObject
 from reportlab.lib import colors
@@ -34,6 +33,11 @@ from reportlab.platypus import (
 
 from scriber.model import BookConfig, Section
 from scriber.profiles import get_profile
+from scriber.typography import font_paths
+
+INK = colors.HexColor("#211f1c")
+MUTED = colors.HexColor("#6e6962")
+RULE = colors.HexColor("#aaa39a")
 
 
 @dataclass(frozen=True)
@@ -64,6 +68,7 @@ class SectionMarker(Flowable):
         canvas._scriber_section_title = self.section.title
         canvas._scriber_section_kind = self.section.kind
         canvas._scriber_section_group = self.section.group
+        canvas._scriber_section_start_page = page
         if self.section.group == "body" and not hasattr(canvas, "_scriber_body_start"):
             canvas._scriber_body_start = page
 
@@ -229,18 +234,38 @@ def _section_story(
     if section.kind == "titlepage":
         story.extend(
             [
-                Spacer(1, 2.1 * inch),
+                Spacer(1, 2.15 * inch),
                 Paragraph(_inline(section.title.upper()), styles["title"]),
             ]
         )
+        for block in section.blocks:
+            style = styles["subtitle"] if block.kind == "heading" else styles["author"]
+            story.append(Paragraph(_inline(block.text), style))
+        return story
     elif section.kind == "copyright":
-        story.append(Spacer(1, 4.5 * inch))
-        story.append(Paragraph(_inline(section.title), styles["front_heading"]))
+        story.append(Spacer(1, 4.15 * inch))
+        story.extend(
+            Paragraph(_inline(block.text), styles["front_small"])
+            for block in section.blocks
+        )
+        return story
+    elif section.kind == "dedication":
+        story.append(Spacer(1, 2.55 * inch))
+        story.extend(
+            Paragraph(_inline(block.text), styles["dedication"])
+            for block in section.blocks
+        )
+        return story
     else:
         story.extend(
             [
                 Spacer(1, 0.55 * inch if section.group == "body" else 0.2 * inch),
-                Paragraph(_inline(section.title), styles["chapter"]),
+                Paragraph(
+                    _inline(section.title),
+                    styles["chapter"]
+                    if section.group == "body"
+                    else styles["front_heading"],
+                ),
             ]
         )
 
@@ -285,8 +310,17 @@ def _section_story(
             )
         else:
             ordered_index = 0
-            style = styles["body_first"] if first_paragraph else styles["body"]
-            story.append(Paragraph(_inline(block.text), style))
+            if section.group == "front":
+                style = styles["front"]
+                rendered = _inline(block.text)
+            else:
+                style = styles["body_first"] if first_paragraph else styles["body"]
+                rendered = (
+                    _opening_small_caps(block.text, style.fontSize)
+                    if first_paragraph and section.group == "body"
+                    else _inline(block.text)
+                )
+            story.append(Paragraph(rendered, style))
             first_paragraph = False
     return story
 
@@ -356,15 +390,23 @@ def _draw_page_furniture(
     x = width - outside if physical_page % 2 else inside
     canvas.saveState()
     canvas.setFont(regular_font, 8)
-    canvas.setFillColor(colors.HexColor("#555555"))
+    canvas.setFillColor(MUTED)
     canvas.drawCentredString(x, 0.38 * inch, str(printed_page))
     title = getattr(canvas, "_scriber_section_title", "")
     group = getattr(canvas, "_scriber_section_group", "")
-    if title and group == "body":
+    section_start = getattr(canvas, "_scriber_section_start_page", None)
+    if title and group == "body" and physical_page != section_start:
         canvas.setFont(regular_font, 7.5)
-        canvas.drawCentredString(
-            width / 2, config.layout.trim_height_inches * inch - 0.4 * inch, title
-        )
+        header_y = config.layout.trim_height_inches * inch - 0.4 * inch
+        left = inside if physical_page % 2 else outside
+        right = width - outside if physical_page % 2 else width - inside
+        if physical_page % 2:
+            canvas.drawRightString(right, header_y, title)
+        else:
+            canvas.drawString(left, header_y, config.book.title.upper())
+        canvas.setStrokeColor(RULE)
+        canvas.setLineWidth(0.4)
+        canvas.line(left, header_y - 7, right, header_y - 7)
     canvas.restoreState()
 
 
@@ -382,33 +424,83 @@ def _styles(
     return {
         "title": ParagraphStyle(
             "Title",
-            fontName=fonts["bold"],
-            fontSize=26,
-            leading=32,
+            fontName=fonts["display"],
+            fontSize=34,
+            leading=40,
+            textColor=INK,
             alignment=TA_CENTER,
-            spaceAfter=18,
+            spaceAfter=14,
+        ),
+        "subtitle": ParagraphStyle(
+            "Subtitle",
+            fontName=fonts["italic"],
+            fontSize=14,
+            leading=18,
+            textColor=MUTED,
+            alignment=TA_CENTER,
+            spaceAfter=24,
+        ),
+        "author": ParagraphStyle(
+            "Author",
+            fontName=fonts["regular"],
+            fontSize=11,
+            leading=14,
+            textColor=MUTED,
+            alignment=TA_CENTER,
         ),
         "front_heading": ParagraphStyle(
             "FrontHeading",
-            fontName=fonts["bold"],
-            fontSize=11,
-            leading=14,
+            fontName=fonts["regular"],
+            fontSize=17,
+            leading=21,
+            textColor=INK,
+            alignment=TA_CENTER,
+            spaceAfter=20,
+        ),
+        "front": ParagraphStyle(
+            "Front",
+            fontName=fonts["regular"],
+            fontSize=10.5,
+            leading=15,
+            textColor=INK,
             alignment=TA_LEFT,
+            spaceAfter=8,
+        ),
+        "front_small": ParagraphStyle(
+            "FrontSmall",
+            fontName=fonts["regular"],
+            fontSize=8.2,
+            leading=11,
+            textColor=MUTED,
+            alignment=TA_LEFT,
+            spaceAfter=5,
+        ),
+        "dedication": ParagraphStyle(
+            "Dedication",
+            fontName=fonts["italic"],
+            fontSize=11,
+            leading=16,
+            textColor=INK,
+            alignment=TA_CENTER,
+            leftIndent=0.28 * inch,
+            rightIndent=0.28 * inch,
             spaceAfter=10,
         ),
         "chapter": ParagraphStyle(
             "Chapter",
-            fontName=fonts["bold"],
+            fontName=fonts["display"],
             fontSize=config.layout.chapter_font_size,
-            leading=config.layout.chapter_font_size * 1.2,
+            leading=config.layout.chapter_font_size + 4,
+            textColor=INK,
             alignment=TA_CENTER,
-            spaceAfter=24,
+            spaceAfter=18,
         ),
         "subheading": ParagraphStyle(
             "Subheading",
             fontName=fonts["bold"],
             fontSize=body_size + 1,
             leading=leading,
+            textColor=INK,
             spaceBefore=10,
             spaceAfter=5,
         ),
@@ -417,9 +509,10 @@ def _styles(
             fontName=fonts["regular"],
             fontSize=body_size,
             leading=leading,
+            textColor=INK,
             alignment=TA_JUSTIFY,
             firstLineIndent=config.layout.paragraph_indent_inches * inch,
-            spaceAfter=0,
+            spaceAfter=2.8,
             allowWidows=0,
             allowOrphans=0,
             hyphenationLang=hyphenation,
@@ -429,9 +522,10 @@ def _styles(
             fontName=fonts["regular"],
             fontSize=body_size,
             leading=leading,
+            textColor=INK,
             alignment=TA_JUSTIFY,
             firstLineIndent=0,
-            spaceAfter=0,
+            spaceAfter=2.8,
             allowWidows=0,
             allowOrphans=0,
             hyphenationLang=hyphenation,
@@ -441,6 +535,7 @@ def _styles(
             fontName=fonts["italic"],
             fontSize=body_size - 0.5,
             leading=leading,
+            textColor=MUTED,
             leftIndent=0.28 * inch,
             rightIndent=0.28 * inch,
             spaceBefore=6,
@@ -451,6 +546,7 @@ def _styles(
             fontName=fonts["italic"],
             fontSize=body_size - 0.25,
             leading=leading,
+            textColor=colors.HexColor("#4d4842"),
             leftIndent=0.35 * inch,
             rightIndent=0.35 * inch,
             borderWidth=0.5,
@@ -464,6 +560,7 @@ def _styles(
             fontName=fonts["regular"],
             fontSize=body_size,
             leading=leading,
+            textColor=INK,
             leftIndent=0.2 * inch,
             firstLineIndent=-0.15 * inch,
         ),
@@ -472,6 +569,7 @@ def _styles(
             fontName=fonts["regular"],
             fontSize=8,
             leading=12,
+            textColor=MUTED,
             alignment=TA_CENTER,
             spaceBefore=8,
             spaceAfter=8,
@@ -493,13 +591,7 @@ def _styles(
 
 
 def _register_fonts(config: BookConfig) -> dict[str, str]:
-    font_dir = Path(reportlab.__file__).resolve().parent / "fonts"
-    paths = {
-        "regular": config.typography.regular or font_dir / "Vera.ttf",
-        "bold": config.typography.bold or font_dir / "VeraBd.ttf",
-        "italic": config.typography.italic or font_dir / "VeraIt.ttf",
-        "bold_italic": config.typography.bold_italic or font_dir / "VeraBI.ttf",
-    }
+    paths = font_paths(config)
     digest = hashlib.sha256()
     for style, path in paths.items():
         if not path.exists():
@@ -512,6 +604,7 @@ def _register_fonts(config: BookConfig) -> dict[str, str]:
         "bold": f"{family}-Bold",
         "italic": f"{family}-Italic",
         "bold_italic": f"{family}-BoldItalic",
+        "display": f"{family}-Display",
     }
     if names["regular"] in pdfmetrics.getRegisteredFontNames():
         return names
@@ -525,6 +618,29 @@ def _register_fonts(config: BookConfig) -> dict[str, str]:
         boldItalic=names["bold_italic"],
     )
     return names
+
+
+def _opening_small_caps(text: str, body_size: float) -> str:
+    source = text.strip()
+    words = list(re.finditer(r"\S+", source))
+    if not words:
+        return ""
+    end = words[min(5, len(words)) - 1].end()
+    prefix = source[:end]
+    if prefix.count("**") % 2:
+        closing = source.find("**", end)
+        if closing >= 0:
+            end = closing + 2
+    elif prefix.replace("**", "").count("*") % 2:
+        closing = source.find("*", end)
+        if closing >= 0:
+            end = closing + 1
+    opening = source[:end].upper()
+    remainder = source[end:].lstrip()
+    rendered = f'<font size="{body_size * 0.84:.2f}">{_inline(opening)}</font>'
+    if remainder:
+        rendered += f" {_inline(remainder)}"
+    return rendered
 
 
 def _inline(value: str) -> str:

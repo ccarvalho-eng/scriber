@@ -13,6 +13,7 @@ from datetime import date
 from pathlib import Path
 
 from scriber.model import BookConfig, Section
+from scriber.typography import font_paths
 
 
 @dataclass(frozen=True)
@@ -38,13 +39,16 @@ def build_epub(
         text_dir = epub / "text"
         styles_dir = epub / "styles"
         images_dir = epub / "images"
+        fonts_dir = epub / "fonts"
         meta_inf = root / "META-INF"
-        for directory in (text_dir, styles_dir, images_dir, meta_inf):
+        for directory in (text_dir, styles_dir, images_dir, fonts_dir, meta_inf):
             directory.mkdir(parents=True, exist_ok=True)
 
         (root / "mimetype").write_text("application/epub+zip", encoding="ascii")
         (meta_inf / "container.xml").write_text(_container_xml(), encoding="utf-8")
         (styles_dir / "book.css").write_text(_stylesheet(), encoding="utf-8")
+        for style, source in font_paths(config).items():
+            (fonts_dir / f"{style}.ttf").write_bytes(source.read_bytes())
 
         filenames: list[tuple[Section, str]] = []
         for index, section in enumerate(sections, start=1):
@@ -140,7 +144,8 @@ def _section_xhtml(config: BookConfig, section: Section) -> str:
     return _xhtml_document(
         config,
         section.title,
-        f'    <section epub:type="{epub_type}">\n      {body}\n    </section>',
+        f'    <section epub:type="{epub_type}" class="{section.kind}">\n'
+        f"      {body}\n    </section>",
     )
 
 
@@ -209,6 +214,11 @@ def _package_opf(
     manifests = [
         '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
         '<item id="css" href="styles/book.css" media-type="text/css"/>',
+        '<item id="font-regular" href="fonts/regular.ttf" media-type="font/ttf"/>',
+        '<item id="font-bold" href="fonts/bold.ttf" media-type="font/ttf"/>',
+        '<item id="font-italic" href="fonts/italic.ttf" media-type="font/ttf"/>',
+        '<item id="font-bold-italic" href="fonts/bold_italic.ttf" media-type="font/ttf"/>',
+        '<item id="font-display" href="fonts/display.ttf" media-type="font/ttf"/>',
     ]
     spine = []
     if cover_present:
@@ -314,18 +324,26 @@ def _container_xml() -> str:
 
 
 def _stylesheet() -> str:
-    return """body { font-family: serif; line-height: 1.45; margin: 5%; }
-h1 { text-align: center; margin: 20% 0 2em; }
+    return """@font-face { font-family: "Scriber Body"; src: url("../fonts/regular.ttf"); font-style: normal; font-weight: normal; }
+@font-face { font-family: "Scriber Body"; src: url("../fonts/bold.ttf"); font-style: normal; font-weight: bold; }
+@font-face { font-family: "Scriber Body"; src: url("../fonts/italic.ttf"); font-style: italic; font-weight: normal; }
+@font-face { font-family: "Scriber Body"; src: url("../fonts/bold_italic.ttf"); font-style: italic; font-weight: bold; }
+@font-face { font-family: "Scriber Display"; src: url("../fonts/display.ttf"); }
+body { color: #211f1c; font-family: "Scriber Body", serif; line-height: 1.35; margin: 0 4%; }
+h1 { font-family: "Scriber Display", serif; font-size: 1.7em; font-weight: normal; text-align: center; margin: 14vh 0 1em; }
 h2 { margin-top: 1.5em; }
-p { margin: 0; text-indent: 1.2em; }
+p { margin: 0; text-indent: 1.2em; orphans: 2; widows: 2; }
 h1 + p, h2 + p, blockquote p, .scene, li { text-indent: 0; }
-blockquote { margin: 1em 8%; font-style: italic; }
-.character-document { border: 1px solid #999; font-style: italic; margin: 1em 8%; padding: 0.8em; }
+.chapter > p:first-of-type::first-line { font-variant: small-caps; text-transform: uppercase; letter-spacing: 0.035em; }
+blockquote { color: #4d4842; margin: 1em 8%; font-style: italic; }
+.character-document { border: 1px solid #aaa39a; color: #4d4842; font-style: italic; margin: 1em 8%; padding: 0.8em; }
 .character-document p { text-indent: 0; }
 ul, ol { margin: 1em 0 1em 2em; padding: 0; }
 li { margin: 0.25em 0; }
 .scene { margin: 1em 0; text-align: center; }
-.book-title { font-size: 2em; margin-top: 35%; }
+.book-title { font-size: 2.3em; margin-top: 28vh; }
+.book-title + h2 { color: #6e6962; font-family: "Scriber Body", serif; font-size: 1em; font-style: italic; font-weight: normal; margin-top: -0.5em; text-align: center; }
+.book-title ~ p { color: #6e6962; text-align: center; text-indent: 0; }
 .cover img { display: block; height: auto; width: 100%; }
 """
 

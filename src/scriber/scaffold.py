@@ -119,10 +119,10 @@ outside_margin_inches = 0.5
 top_margin_inches = 0.7
 bottom_margin_inches = 0.7
 gutter_safety_inches = 0.125
-body_font_size = 10.5
-body_leading = 14.5
+body_font_size = 10.2
+body_leading = 14.25
 chapter_font_size = 20
-paragraph_indent_inches = 0.22
+paragraph_indent_inches = 0.19
 chapter_start_recto = true
 
 [typography]

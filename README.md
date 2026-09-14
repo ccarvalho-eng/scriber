@@ -272,7 +272,7 @@ bold_italic = "assets/fonts/Family-BoldItalic.ttf"
 hyphenation = true
 ```
 
-All four files are required so print emphasis remains embedded and predictable. Without custom files, Scriber uses its portable bundled type family.
+All four files are required so print emphasis remains embedded and predictable. Without custom files, Scriber uses Gelasio, a Georgia-compatible literary serif, with Cinzel display headings. Both bundled families are embedded in print and EPUB output.
 
 ## Manage several books
 
